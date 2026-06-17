@@ -17,7 +17,16 @@
   /* control panel */
   #panel{position:absolute;z-index:1000;top:12px;left:12px;width:248px;
          background:var(--panel);border:1px solid var(--line);border-radius:10px;
-         padding:14px 16px;box-shadow:0 8px 28px rgba(0,0,0,.5)}
+         padding:14px 16px;box-shadow:0 8px 28px rgba(0,0,0,.5);transition:padding .15s}
+  #phead{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  #toggle{flex:none;width:26px;height:26px;margin:-2px -4px 0 0;border:1px solid var(--line);
+          background:#0d1117;color:var(--txt);border-radius:6px;cursor:pointer;font-size:14px;
+          line-height:1;display:flex;align-items:center;justify-content:center;transition:.12s}
+  #toggle:hover{border-color:#484f58}
+  /* collapsed: keep only the title row, shrink to a compact handle */
+  #panel.min{padding:9px 12px;width:auto}
+  #panel.min #pbody{display:none}
+  #panel.min h1{font-size:14px;margin:0}
   #panel h1{font-size:15px;margin:0 0 2px;letter-spacing:.2px}
   #panel .sub{font-size:11px;color:var(--mut);margin:0 0 12px;line-height:1.4}
   .metric{display:block;width:100%;text-align:left;border:1px solid var(--line);
@@ -51,13 +60,18 @@
 <div id="map"></div>
 
 <div id="panel">
-  <h1>Liberland on the map</h1>
-  <p class="sub">Registered Liberlanders, e-residents and citizens by city. Anonymized counts only — cities with at least 5 people.</p>
-  <button class="metric on" data-k="liberlanders"><span><span class="dot" style="background:#58a6ff"></span>Liberlanders</span><span class="n" id="n-liberlanders"></span></button>
-  <button class="metric" data-k="eresidents"><span><span class="dot" style="background:#3fb950"></span>E-residents</span><span class="n" id="n-eresidents"></span></button>
-  <button class="metric" data-k="citizens"><span><span class="dot" style="background:#f5d90a"></span>Citizens</span><span class="n" id="n-citizens"></span></button>
-  <button class="metric" data-k="members"><span><span class="dot" style="background:#db61a2"></span>Members (cit.+e-res.)</span><span class="n" id="n-members"></span></button>
-  <div class="foot"><span id="ncities"></span> cities shown · circle size ∝ count.<br>Source: Liberland government database.</div>
+  <div id="phead">
+    <h1>Liberland on the map</h1>
+    <button id="toggle" aria-label="Minimize panel" aria-expanded="true" title="Minimize">–</button>
+  </div>
+  <div id="pbody">
+    <p class="sub">Registered Liberlanders, e-residents and citizens by city. Anonymized counts only — cities with at least 5 people.</p>
+    <button class="metric on" data-k="liberlanders"><span><span class="dot" style="background:#58a6ff"></span>Liberlanders</span><span class="n" id="n-liberlanders"></span></button>
+    <button class="metric" data-k="eresidents"><span><span class="dot" style="background:#3fb950"></span>E-residents</span><span class="n" id="n-eresidents"></span></button>
+    <button class="metric" data-k="citizens"><span><span class="dot" style="background:#f5d90a"></span>Citizens</span><span class="n" id="n-citizens"></span></button>
+    <button class="metric" data-k="members"><span><span class="dot" style="background:#db61a2"></span>Members (cit.+e-res.)</span><span class="n" id="n-members"></span></button>
+    <div class="foot"><span id="ncities"></span> cities shown · circle size ∝ count.<br>Source: Liberland government database.</div>
+  </div>
 </div>
 
 <div id="legend">
@@ -129,6 +143,18 @@ document.querySelectorAll('.metric').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.metric').forEach(x=>x.classList.remove('on'));
   b.classList.add('on'); current=b.dataset.k; draw();
 }));
+
+// Minimize / expand the control panel (keeps the map clear on small screens).
+const panel=document.getElementById('panel'), toggle=document.getElementById('toggle');
+function setMin(min){
+  panel.classList.toggle('min',min);
+  toggle.textContent=min?'+':'–';
+  toggle.title=toggle.ariaLabel=min?'Show controls':'Minimize';
+  toggle.setAttribute('aria-expanded',String(!min));
+}
+toggle.addEventListener('click',()=>setMin(!panel.classList.contains('min')));
+// start collapsed on narrow screens so it doesn't cover the map
+if(window.matchMedia('(max-width:520px)').matches) setMin(true);
 </script>
 </body>
 </html>
