@@ -66,17 +66,17 @@
   </div>
   <div id="pbody">
     <p class="sub">Registered Liberlanders, e-residents and citizens by city. Anonymized counts only — cities with at least 5 people.</p>
-    <button class="metric on" data-k="liberlanders"><span><span class="dot" style="background:#58a6ff"></span>Liberlanders</span><span class="n" id="n-liberlanders"></span></button>
+    <button class="metric" data-k="liberlanders"><span><span class="dot" style="background:#58a6ff"></span>Liberlanders</span><span class="n" id="n-liberlanders"></span></button>
     <button class="metric" data-k="eresidents"><span><span class="dot" style="background:#3fb950"></span>E-residents</span><span class="n" id="n-eresidents"></span></button>
     <button class="metric" data-k="citizens"><span><span class="dot" style="background:#f5d90a"></span>Citizens</span><span class="n" id="n-citizens"></span></button>
-    <button class="metric" data-k="members"><span><span class="dot" style="background:#db61a2"></span>Members (cit.+e-res.)</span><span class="n" id="n-members"></span></button>
+    <button class="metric on" data-k="members"><span><span class="dot" style="background:#db61a2"></span>Members (cit.+e-res.)</span><span class="n" id="n-members"></span></button>
     <div class="foot"><span id="ncities"></span> cities shown · circle size ∝ count.<br>Source: Liberland government database.</div>
   </div>
 </div>
 
 <div id="legend">
-  <b id="legend-title">Liberlanders</b> per city
-  <div class="row"><svg width="44" height="14"><circle cx="7" cy="7" r="3" fill="#58a6ff" fill-opacity=".6" stroke="#58a6ff"/><circle cx="24" cy="7" r="6" fill="#58a6ff" fill-opacity=".6" stroke="#58a6ff"/><circle cx="40" cy="7" r="5" fill="none"/></svg> fewer → more</div>
+  <b id="legend-title">Members</b> per city
+  <div class="row"><svg width="44" height="14"><circle class="lg" cx="7" cy="7" r="3" fill-opacity=".6"/><circle class="lg" cx="24" cy="7" r="6" fill-opacity=".6"/></svg> fewer → more</div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -94,7 +94,7 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png'
 const labels=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
   {subdomains:'abcd',maxZoom:9,pane:'shadowPane'}).addTo(map);
 
-let CITIES=[], current="liberlanders";
+let CITIES=[], current="members";
 const layer=L.layerGroup().addTo(map);
 const nf=new Intl.NumberFormat('en-US');
 
@@ -121,6 +121,9 @@ function draw(){
   }
   document.getElementById('ncities').textContent=nf.format(shown);
   document.getElementById('legend-title').textContent=LABELS[current];
+  document.querySelectorAll('#legend circle.lg').forEach(c=>{
+    c.setAttribute('fill',COLORS[current]); c.setAttribute('stroke',COLORS[current]);
+  });
 }
 
 function popup(c){
