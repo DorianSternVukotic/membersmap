@@ -1,0 +1,23 @@
+# Keep this repo PII-free. Never commit source database dumps or full exports.
+*.sql
+*.sql.gz
+*.dump
+
+# Only the anonymized data.json belongs here — block other CSV/exports.
+*.csv
+city_people_full*
+*_full.*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*~
+.~lock.*#
+.vscode/
+.idea/
+
+# Node tooling (if you add a serve/deploy helper)
+node_modules/
+.netlify/
+.vercel/
+.wrangler/

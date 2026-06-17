@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liberland on the map — Liberlanders, e-residents & citizens by city</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+  :root{ --bg:#0d1117; --panel:#161b22; --line:#30363d; --txt:#e6edf3; --mut:#8b949e;
+         --accent:#f5d90a; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+            background:var(--bg);color:var(--txt)}
+  #map{position:absolute;inset:0;background:#0d1117}
+  .leaflet-container{background:#0d1117}
+  /* control panel */
+  #panel{position:absolute;z-index:1000;top:12px;left:12px;width:248px;
+         background:var(--panel);border:1px solid var(--line);border-radius:10px;
+         padding:14px 16px;box-shadow:0 8px 28px rgba(0,0,0,.5)}
+  #panel h1{font-size:15px;margin:0 0 2px;letter-spacing:.2px}
+  #panel .sub{font-size:11px;color:var(--mut);margin:0 0 12px;line-height:1.4}
+  .metric{display:block;width:100%;text-align:left;border:1px solid var(--line);
+          background:#0d1117;color:var(--txt);border-radius:7px;padding:8px 10px;
+          margin:6px 0;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;
+          align-items:center;transition:.12s}
+  .metric:hover{border-color:#484f58}
+  .metric.on{border-color:var(--accent);background:#1c2230}
+  .metric .n{font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px}
+  .metric.on .n{color:var(--accent)}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:8px;vertical-align:-1px}
+  .foot{font-size:10px;color:var(--mut);margin-top:12px;line-height:1.5;border-top:1px solid var(--line);padding-top:10px}
+  /* legend */
+  #legend{position:absolute;z-index:1000;bottom:18px;left:12px;background:var(--panel);
+          border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:11px;color:var(--mut)}
+  #legend b{color:var(--txt);font-weight:600}
+  #legend .row{display:flex;align-items:center;gap:7px;margin-top:5px}
+  .leaflet-popup-content-wrapper{background:var(--panel);color:var(--txt);border-radius:8px}
+  .leaflet-popup-tip{background:var(--panel)}
+  .leaflet-popup-content{margin:10px 12px;font-size:13px}
+  .leaflet-popup-content .city{font-size:14px;font-weight:600;margin-bottom:4px}
+  .leaflet-popup-content table{border-collapse:collapse;margin-top:4px}
+  .leaflet-popup-content td{padding:1px 0}
+  .leaflet-popup-content td.v{text-align:right;padding-left:14px;font-variant-numeric:tabular-nums}
+  .leaflet-control-attribution{background:rgba(13,17,23,.7)!important;color:#6e7681!important}
+  .leaflet-control-attribution a{color:#8b949e!important}
+  @media(max-width:520px){#panel{width:calc(100% - 24px)}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="panel">
+  <h1>Liberland on the map</h1>
+  <p class="sub">Registered Liberlanders, e-residents and citizens by city. Anonymized counts only — cities with at least 5 people.</p>
+  <button class="metric on" data-k="liberlanders"><span><span class="dot" style="background:#58a6ff"></span>Liberlanders</span><span class="n" id="n-liberlanders"></span></button>
+  <button class="metric" data-k="eresidents"><span><span class="dot" style="background:#3fb950"></span>E-residents</span><span class="n" id="n-eresidents"></span></button>
+  <button class="metric" data-k="citizens"><span><span class="dot" style="background:#f5d90a"></span>Citizens</span><span class="n" id="n-citizens"></span></button>
+  <button class="metric" data-k="members"><span><span class="dot" style="background:#db61a2"></span>Members (cit.+e-res.)</span><span class="n" id="n-members"></span></button>
+  <div class="foot"><span id="ncities"></span> cities shown · circle size ∝ count.<br>Source: Liberland government database.</div>
+</div>
+
+<div id="legend">
+  <b id="legend-title">Liberlanders</b> per city
+  <div class="row"><svg width="44" height="14"><circle cx="7" cy="7" r="3" fill="#58a6ff" fill-opacity=".6" stroke="#58a6ff"/><circle cx="24" cy="7" r="6" fill="#58a6ff" fill-opacity=".6" stroke="#58a6ff"/><circle cx="40" cy="7" r="5" fill="none"/></svg> fewer → more</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+const COLORS={liberlanders:"#58a6ff",eresidents:"#3fb950",citizens:"#f5d90a",members:"#db61a2"};
+const LABELS={liberlanders:"Liberlanders",eresidents:"E-residents",citizens:"Citizens",members:"Members"};
+
+const map=L.map('map',{worldCopyJump:true,minZoom:2,maxZoom:9,zoomControl:true})
+            .setView([25,15],3);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:9
+}).addTo(map);
+// place labels on a layer above the dots so cities stay readable
+const labels=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+  {subdomains:'abcd',maxZoom:9,pane:'shadowPane'}).addTo(map);
+
+let CITIES=[], current="liberlanders";
+const layer=L.layerGroup().addTo(map);
+const nf=new Intl.NumberFormat('en-US');
+
+// radius scale: sqrt so AREA ∝ count, clamped to a sensible pixel range
+function radiusFn(key){
+  let max=1; for(const c of CITIES) if(c[key]>max) max=c[key];
+  const R=Math.sqrt(max);
+  return v=> v<=0?0 : 3 + 22*(Math.sqrt(v)/R);
+}
+
+function draw(){
+  layer.clearLayers();
+  const r=radiusFn(current);
+  // draw biggest first so small dots sit on top and stay clickable
+  const sorted=[...CITIES].sort((a,b)=>b[current]-a[current]);
+  let shown=0;
+  for(const c of sorted){
+    if(c[current]<=0) continue;
+    shown++;
+    L.circleMarker([c.lat,c.lon],{
+      radius:r(c[current]),color:COLORS[current],weight:1,
+      fillColor:COLORS[current],fillOpacity:.55,opacity:.9
+    }).bindPopup(popup(c)).addTo(layer);
+  }
+  document.getElementById('ncities').textContent=nf.format(shown);
+  document.getElementById('legend-title').textContent=LABELS[current];
+}
+
+function popup(c){
+  const row=(lbl,v,k)=>`<tr><td><span class="dot" style="background:${COLORS[k]}"></span>${lbl}</td><td class="v">${nf.format(v)}</td></tr>`;
+  return `<div class="city">${esc(c.city)} <span style="color:#8b949e;font-weight:400">${c.iso2}</span></div>`+
+    `<table>${row('Liberlanders',c.liberlanders,'liberlanders')}${row('E-residents',c.eresidents,'eresidents')}${row('Citizens',c.citizens,'citizens')}${row('Members',c.members,'members')}</table>`;
+}
+function esc(s){return s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+
+fetch('data.json').then(r=>r.json()).then(d=>{
+  const F=d.fields;
+  CITIES=d.cities.map(a=>{const o={};F.forEach((f,i)=>o[f]=a[i]);return o;});
+  // totals for the panel
+  const sum=k=>CITIES.reduce((s,c)=>s+c[k],0);
+  for(const k of Object.keys(LABELS)) document.getElementById('n-'+k).textContent=nf.format(sum(k));
+  draw();
+});
+
+document.querySelectorAll('.metric').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.metric').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); current=b.dataset.k; draw();
+}));
+</script>
+</body>
+</html>
