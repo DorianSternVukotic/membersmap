@@ -44,6 +44,10 @@
           border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:11px;color:var(--mut)}
   #legend b{color:var(--txt);font-weight:600}
   #legend .row{display:flex;align-items:center;gap:7px;margin-top:5px}
+  #legend .grad{height:9px;width:150px;border-radius:4px;margin-top:6px;
+                background:linear-gradient(90deg,#f85149,#f5d90a,#3fb950)}
+  #legend .gradlabels{display:flex;justify-content:space-between;width:150px;margin-top:3px;color:var(--mut)}
+  #legend .cnote{margin-top:5px;color:var(--mut)}
   .leaflet-popup-content-wrapper{background:var(--panel);color:var(--txt);border-radius:8px}
   .leaflet-popup-tip{background:var(--panel)}
   .leaflet-popup-content{margin:10px 12px;font-size:13px}
@@ -70,20 +74,34 @@
     <button class="metric" data-k="eresidents"><span><span class="dot" style="background:#3fb950"></span>E-residents</span><span class="n" id="n-eresidents"></span></button>
     <button class="metric" data-k="citizens"><span><span class="dot" style="background:#f5d90a"></span>Citizens</span><span class="n" id="n-citizens"></span></button>
     <button class="metric on" data-k="members"><span><span class="dot" style="background:#db61a2"></span>Members (cit.+e-res.)</span><span class="n" id="n-members"></span></button>
+    <button class="metric" data-k="conversion"><span><span class="dot" style="background:linear-gradient(90deg,#f85149,#f5d90a,#3fb950)"></span>Conversion rate</span><span class="n" id="n-conversion"></span></button>
     <div class="foot"><span id="ncities"></span> cities shown · circle size ∝ count.<br>Source: Liberland government database.</div>
   </div>
 </div>
 
 <div id="legend">
-  <b id="legend-title">Members</b> per city
-  <div class="row"><svg width="44" height="14"><circle class="lg" cx="7" cy="7" r="3" fill-opacity=".6"/><circle class="lg" cx="24" cy="7" r="6" fill-opacity=".6"/></svg> fewer → more</div>
+  <b id="legend-title">Members</b><span id="legend-suffix"> per city</span>
+  <div class="row" id="legend-size"><svg width="44" height="14"><circle class="lg" cx="7" cy="7" r="3" fill-opacity=".6"/><circle class="lg" cx="24" cy="7" r="6" fill-opacity=".6"/></svg> fewer → more</div>
+  <div id="legend-conv" style="display:none">
+    <div class="grad"></div>
+    <div class="gradlabels"><span>0%</span><span>5%</span><span>≥10%</span></div>
+    <div class="cnote">size ∝ audience · cities with ≥10 registered</div>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
-const COLORS={liberlanders:"#58a6ff",eresidents:"#3fb950",citizens:"#f5d90a",members:"#db61a2"};
-const LABELS={liberlanders:"Liberlanders",eresidents:"E-residents",citizens:"Citizens",members:"Members"};
+const COLORS={liberlanders:"#58a6ff",eresidents:"#3fb950",citizens:"#f5d90a",members:"#db61a2",conversion:"#3fb950"};
+const LABELS={liberlanders:"Liberlanders",eresidents:"E-residents",citizens:"Citizens",members:"Members",conversion:"Conversion"};
+// conversion (members/liberlanders): map a rate to a red→amber→green gradient, full green at >=10%
+function convColor(rate){
+  const t=Math.max(0,Math.min(1,rate/0.10));
+  const stops=[[248,81,73],[245,217,10],[63,185,80]];
+  const seg=t*2, i=Math.min(1,Math.floor(seg)), f=seg-i, a=stops[i], b=stops[i+1];
+  const c=a.map((v,j)=>Math.round(v+(b[j]-v)*f));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
 
 const map=L.map('map',{worldCopyJump:true,minZoom:2,maxZoom:9,zoomControl:true})
             .setView([25,15],3);
@@ -107,38 +125,51 @@ function radiusFn(key){
 
 function draw(){
   layer.clearLayers();
-  const r=radiusFn(current);
+  const isConv=current==="conversion";
+  const sizeKey=isConv?"liberlanders":current;   // conversion sizes by audience, colors by rate
+  const r=radiusFn(sizeKey);
   // draw biggest first so small dots sit on top and stay clickable
-  const sorted=[...CITIES].sort((a,b)=>b[current]-a[current]);
+  const sorted=[...CITIES].sort((a,b)=>b[sizeKey]-a[sizeKey]);
   let shown=0;
   for(const c of sorted){
-    if(c[current]<=0) continue;
+    if(c[sizeKey]<=0) continue;
+    if(isConv && c.liberlanders<10) continue;    // suppress tiny-sample noise (rate needs a base)
     shown++;
+    const col=isConv?convColor(c.conversion):COLORS[current];
     L.circleMarker([c.lat,c.lon],{
-      radius:r(c[current]),color:COLORS[current],weight:1,
-      fillColor:COLORS[current],fillOpacity:.55,opacity:.9
+      radius:r(c[sizeKey]),color:col,weight:1,
+      fillColor:col,fillOpacity:.55,opacity:.9
     }).bindPopup(popup(c)).addTo(layer);
   }
   document.getElementById('ncities').textContent=nf.format(shown);
   document.getElementById('legend-title').textContent=LABELS[current];
-  document.querySelectorAll('#legend circle.lg').forEach(c=>{
+  document.getElementById('legend-suffix').textContent=isConv?' rate by city':' per city';
+  document.getElementById('legend-size').style.display=isConv?'none':'';
+  document.getElementById('legend-conv').style.display=isConv?'':'none';
+  if(!isConv) document.querySelectorAll('#legend circle.lg').forEach(c=>{
     c.setAttribute('fill',COLORS[current]); c.setAttribute('stroke',COLORS[current]);
   });
 }
 
 function popup(c){
   const row=(lbl,v,k)=>`<tr><td><span class="dot" style="background:${COLORS[k]}"></span>${lbl}</td><td class="v">${nf.format(v)}</td></tr>`;
+  const pct=c.liberlanders?(100*c.members/c.liberlanders).toFixed(1)+'%':'—';
+  const crow=`<tr><td style="padding-top:4px;border-top:1px solid #30363d">Conversion</td><td class="v" style="padding-top:4px;border-top:1px solid #30363d">${pct}</td></tr>`;
   return `<div class="city">${esc(c.city)} <span style="color:#8b949e;font-weight:400">${c.iso2}</span></div>`+
-    `<table>${row('Liberlanders',c.liberlanders,'liberlanders')}${row('E-residents',c.eresidents,'eresidents')}${row('Citizens',c.citizens,'citizens')}${row('Members',c.members,'members')}</table>`;
+    `<table>${row('Liberlanders',c.liberlanders,'liberlanders')}${row('E-residents',c.eresidents,'eresidents')}${row('Citizens',c.citizens,'citizens')}${row('Members',c.members,'members')}${crow}</table>`;
 }
 function esc(s){return s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
 
 fetch('data.json').then(r=>r.json()).then(d=>{
   const F=d.fields;
   CITIES=d.cities.map(a=>{const o={};F.forEach((f,i)=>o[f]=a[i]);return o;});
+  CITIES.forEach(c=>c.conversion=c.liberlanders>0?c.members/c.liberlanders:0);
   // totals for the panel
   const sum=k=>CITIES.reduce((s,c)=>s+c[k],0);
-  for(const k of Object.keys(LABELS)) document.getElementById('n-'+k).textContent=nf.format(sum(k));
+  for(const k of ['liberlanders','eresidents','citizens','members'])
+    document.getElementById('n-'+k).textContent=nf.format(sum(k));
+  const lib=sum('liberlanders');
+  document.getElementById('n-conversion').textContent=lib?(100*sum('members')/lib).toFixed(1)+'%':'—';
   draw();
 });
 
